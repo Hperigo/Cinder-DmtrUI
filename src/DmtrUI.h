@@ -122,6 +122,20 @@ namespace DmtrUI {
 			if (tipo == RADIO) {
 
 			}
+
+			if (tipo == RADIOITEM) {
+				textColor = ColorA(1,1,1,1);
+				// nao sei se vai funcionar
+				vec2 wh = mFont->measureString(nome);
+				int margemX = 6;
+				rect.x2 = rect.x1 + wh.x + margemX*2;
+				rect.y2 = rect.y1 + wh.y + 4;
+				textOffset = vec2(margemX, textY);
+			}
+		}
+
+		vec2 getDimensions() {
+			return vec2(rect.x2-rect.x1, rect.y2-rect.y1);
 		}
 
 		void draw() {
@@ -155,9 +169,15 @@ namespace DmtrUI {
 			}
 
 			if (tipo == RADIO) {
+				//cout << "radio draw" << endl;
+				gl::pushMatrices();
+				gl::translate(rect.x1, rect.y1);
+				//cout << rect << endl;
 				for (auto & e : elements) {
 					e.draw();
+					//cout << e.nome << endl;
 				}
+				gl::popMatrices();
 			}
 			color(textColor);
 			mFont->drawString((nome), rect.getUpperLeft() + textOffset);
@@ -166,13 +186,18 @@ namespace DmtrUI {
 		void checkMouse(vec2 mouse) {
 			if (tipo == SLIDER) {
 				*_val = lmap<float>(mouse.x , rect.getX1(), rect.getX2(), min, max);
-			} else if (tipo == SLIDERINT) {
+			}
+			else if (tipo == SLIDERINT) {
 				*_valInt = lmap<int>(mouse.x , rect.getX1(), rect.getX2(), min, max);
 			}
 			else if (tipo == TOGGLE) {
 				*_valBool = !*_valBool;
 				//cout << *_valBool << endl;
 			}
+			else if (tipo == RADIOITEM) {
+				
+			}
+
 			redraw = true;
 		}
 	};
@@ -267,6 +292,7 @@ namespace DmtrUI {
 	}
 
 	void update() {
+		easing = pFloat["easing"];
 		for (auto & p : pFloat) {
 			if (easing > 0) {
 				pEasy[p.first] += (pFloat[p.first] - pEasy[p.first])/easing;
@@ -357,11 +383,16 @@ namespace DmtrUI {
 			int w = 120;
 			int h = sliderHeight;
 			tc.rect = Rectf(flowing.x, flowing.y, flowing.x + w, flowing.y + h);
+			tc.init(o, RADIOITEM);
+
 			te.elements.push_back(tc);
-			flowing.x += w + 2;
+			vec2 dimensoes = tc.getDimensions();
+			flowing.x += dimensoes.x + 2;
 		}
+		te.rect = Rectf(flow.x, flow.y, flow.x + sliderWidth, flow.y + sliderHeight);
 		te.init(nome, RADIO);
 		elements.push_back(te);
+		flow.y += sliderHeight + sliderMargin;
 	}
 
 	void createBool(string nome) {
@@ -430,6 +461,9 @@ namespace DmtrUI {
 				} else if (tipo == "toggle" || tipo == "bool") {
 					pBool[nome] = stoi(tabs[2]);
 					createBool(nome);
+				}
+				else if (tipo == "radio") {
+					createRadio(nome, split(tabs[2], " "));
 				}
 			}
 		}
