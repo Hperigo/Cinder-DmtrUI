@@ -1,5 +1,7 @@
 /*
- 
+
+ make two kinds of rects. one for layout and another for clicking
+ useful in toggle buttons for example
 
  */
 
@@ -23,6 +25,7 @@ namespace DmtrUI {
 	string presetsFolder = "presets/";
 
 	map <string, float> 		pFloat;
+	map <string, float> 		pEasy;
 	map <string, int>  	 	pInt;
 	map <string, bool>	 	pBool;
 	map <string, string> 	pString;
@@ -36,9 +39,10 @@ namespace DmtrUI {
 	int sliderWidth = 200;
 	int sliderHeight = 25;
 	int sliderMargin = 5;
+	float easing = 4.0;
 
 	enum elementType {
-		SLIDER, SLIDERINT, TOGGLE, LABEL, RADIO
+		SLIDER, SLIDERINT, TOGGLE, LABEL, RADIO, RADIOITEM
 	};
 
 	class element {
@@ -48,19 +52,23 @@ namespace DmtrUI {
 		int   	*_valInt;
 		bool	  	*_valBool;
 		string	*_valString;
+		// 'auto' not allowed in non-static class member
+		//auto		*_autoVal;
 		string 	nome;
 		Rectf 	rect;
 		Color	cor;
 		ColorA 	corBg = ColorA(0,0,0,.4);
 		ColorA 	textColor;
-		float		min = 0;
-		float		max = 1;
-		float		def = .5;
+		float	min = 0;
+		float	max = 1;
+		float	def = .5;
 		vec2		textOffset;
 
+		// radio, que tal? recursion. will it work?
+		vector <element> elements;
 
 		// seria lindo mas traz "auto return without trailing return type"
-//		auto getVal() {
+//		auto getVal() -> decltype(*_autoVal) {
 //			if (tipo == SLIDER) {
 //				return *_val;
 //			}
@@ -93,9 +101,10 @@ namespace DmtrUI {
 				textOffset = vec2(sliderHeight + sliderMargin, textY);
 				_valBool = &pBool[nome];
 			}
-//			else if (tipo == RADIO) {
-//				_valString = &pString[nome];
-//			}
+			// NOT YET
+			else if (tipo == RADIO) {
+				_valString = &pString[nome];
+			}
 
 			else if (tipo == LABEL) {
 				textOffset = vec2(0, textY);
@@ -108,6 +117,10 @@ namespace DmtrUI {
 			if (tipo == SLIDER || tipo == SLIDERINT) {
 				textOffset = vec2(8, textY);
 				textColor = ColorA(1,1,1,1);
+			}
+
+			if (tipo == RADIO) {
+
 			}
 		}
 
@@ -134,6 +147,17 @@ namespace DmtrUI {
 					drawSolidRect(Rectf(rect.x1, rect.y1, rect.x1 + x2, rect.y2));
 				}
 
+			}
+
+			if (tipo == RADIOITEM) {
+				color(cor);
+				drawSolidRect(rect);
+			}
+
+			if (tipo == RADIO) {
+				for (auto & e : elements) {
+					e.draw();
+				}
 			}
 			color(textColor);
 			mFont->drawString((nome), rect.getUpperLeft() + textOffset);
@@ -198,21 +222,23 @@ namespace DmtrUI {
 	}
 
 	void load(string filename) {
-		XmlTree doc ( loadFile (filename) );
-		XmlTree ui =  doc.getChild("DmtrUI");
-		for (auto & e : elements) {
-			if (e.tipo == SLIDER) {
-				*e._val = (ui.getChild(e.nome).getValue<float>());
+		if (fs::exists(filename)) {
+			XmlTree doc ( loadFile (filename) );
+			XmlTree ui =  doc.getChild("DmtrUI");
+			for (auto & e : elements) {
+				if (e.tipo == SLIDER) {
+					*e._val = (ui.getChild(e.nome).getValue<float>());
+				}
+				else if (e.tipo == SLIDERINT) {
+					*e._valInt = (ui.getChild(e.nome).getValue<int>());
+				}
+				else if (e.tipo == TOGGLE) {
+					*e._valBool = (ui.getChild(e.nome).getValue<bool>());
+				}
+	//			else if (e.tipo == RADIO) {
+	//				*e._valString = (ui.getChild(e.nome).getValue<string>());
+	//			}
 			}
-			else if (e.tipo == SLIDERINT) {
-				*e._valInt = (ui.getChild(e.nome).getValue<int>());
-			}
-			else if (e.tipo == TOGGLE) {
-				*e._valBool = (ui.getChild(e.nome).getValue<bool>());
-			}
-//			else if (e.tipo == RADIO) {
-//				*e._valString = (ui.getChild(e.nome).getValue<string>());
-//			}
 		}
 	}
 
@@ -240,44 +266,15 @@ namespace DmtrUI {
 
 	}
 
-
-	void setup( const ci::app::WindowRef& window = ci::app::getWindow()) {
-
-		// Fonte rendering nao muito bom ainda. como melhorar? seria algo do retina?
-		fonte = Font( loadAsset("SimplonBP-Regular.otf"), 50.0 );
-//		string fontFile = "SimplonBP-Medium.otf";
-		string fontFile = "SimplonBP-Regular.otf";
-		mFont = gl::TextureFont::create( Font( loadAsset(fontFile), 18 ));
-		//, gl::TextureFont::Format().enableMipmapping()
-
-		static vector<signals::Connection> sWindowConnections;
-		sWindowConnections = {
-			window->getSignalMouseDown().connect( mouseDown ),
-			window->getSignalMouseDrag().connect( mouseDrag ),
-			//window->getSignalDraw().connect ( draw ),
-			//			window->getSignalMouseUp().connect( mouseUp ),
-			//			window->getSignalMouseMove().connect( mouseMove ),
-			//			window->getSignalMouseWheel().connect( mouseWheel ),
-			window->getSignalKeyDown().connect( keyDown ),
-			window->getSignalKeyUp().connect( keyUp ),
-			//			window->getSignalResize().connect( resize ),
-		};
-
-		mFbo = gl::Fbo::create( 320,800 );
-
-		cores.push_back(Colorf(160/255.0f,  43/255.0f, 255/255.0f));  // 0 roxo
-		cores.push_back(Colorf(234/255.0f,  40/255.0f, 140/255.0f));  // 1 rosa
-		cores.push_back(Colorf(255/255.0f,  109/255.0f, 0/255.0f));   // 2 laranja
-		cores.push_back(Colorf(255/255.0f,  255/255.0f, 0/255.0f));   // 3 amarelo
-		cores.push_back(Colorf(0/255.0f,  211/255.0f, 24/255.0f));    // 4 verde
-		cores.push_back(Colorf(0/255.0f,  206/255.0f, 255/255.0f));   // 5 azul
-
-		coresOver.push_back(Colorf(122/255.0f,  35/255.0f, 204/255.0f));  // 0 roxo OK
-		coresOver.push_back(Colorf(234/255.0f,  40/255.0f, 140/255.0f));  // 1 rosa
-		coresOver.push_back(Colorf(255/255.0f,  109/255.0f, 0/255.0f));   // 2 laranja
-		coresOver.push_back(Colorf(255/255.0f,  255/255.0f, 0/255.0f));   // 3 amarelo
-		coresOver.push_back(Colorf(0/255.0f,  158/255.0f, 11/255.0f));    // 4 verde OK
-		coresOver.push_back(Colorf(0/255.0f,  175/255.0f, 204/255.0f));   // 5 azul OK
+	void update() {
+		for (auto & p : pFloat) {
+			if (easing > 0) {
+				pEasy[p.first] += (pFloat[p.first] - pEasy[p.first])/easing;
+			}
+			else {
+				pEasy[p.first] = pFloat[p.first];
+			}
+		}
 	}
 
 
@@ -307,7 +304,65 @@ namespace DmtrUI {
 	}
 
 
+	void setup( const ci::app::WindowRef& window = ci::app::getWindow()) {
+
+		// Fonte rendering nao muito bom ainda. como melhorar? seria algo do retina?
+		fonte = Font( loadAsset("SimplonBP-Regular.otf"), 50.0 );
+//		string fontFile = "SimplonBP-Medium.otf";
+		string fontFile = "SimplonBP-Regular.otf";
+		mFont = gl::TextureFont::create( Font( loadAsset(fontFile), 18 ));
+		//, gl::TextureFont::Format().enableMipmapping()
+
+		static vector<signals::Connection> sWindowConnections;
+		sWindowConnections = {
+			window->getSignalMouseDown().connect( mouseDown ),
+			window->getSignalMouseDrag().connect( mouseDrag ),
+			window->getSignalDraw().connect( update ),
+			window->getSignalPostDraw().connect ( draw ),
+			//			window->getSignalMouseUp().connect( mouseUp ),
+			//			window->getSignalMouseMove().connect( mouseMove ),
+			//			window->getSignalMouseWheel().connect( mouseWheel ),
+			window->getSignalKeyDown().connect( keyDown ),
+			window->getSignalKeyUp().connect( keyUp ),
+			//			window->getSignalResize().connect( resize ),
+		};
+
+		mFbo = gl::Fbo::create( 320,800 );
+
+		cores.push_back(Colorf(160/255.0f,  43/255.0f, 255/255.0f));  // 0 roxo
+		cores.push_back(Colorf(234/255.0f,  40/255.0f, 140/255.0f));  // 1 rosa
+		cores.push_back(Colorf(255/255.0f,  109/255.0f, 0/255.0f));   // 2 laranja
+		cores.push_back(Colorf(255/255.0f,  255/255.0f, 0/255.0f));   // 3 amarelo
+		cores.push_back(Colorf(0/255.0f,  211/255.0f, 24/255.0f));    // 4 verde
+		cores.push_back(Colorf(0/255.0f,  206/255.0f, 255/255.0f));   // 5 azul
+
+		coresOver.push_back(Colorf(122/255.0f,  35/255.0f, 204/255.0f));  // 0 roxo OK
+		coresOver.push_back(Colorf(234/255.0f,  40/255.0f, 140/255.0f));  // 1 rosa
+		coresOver.push_back(Colorf(255/255.0f,  109/255.0f, 0/255.0f));   // 2 laranja
+		coresOver.push_back(Colorf(255/255.0f,  255/255.0f, 0/255.0f));   // 3 amarelo
+		coresOver.push_back(Colorf(0/255.0f,  158/255.0f, 11/255.0f));    // 4 verde OK
+		coresOver.push_back(Colorf(0/255.0f,  175/255.0f, 204/255.0f));   // 5 azul OK
+	}
+
+
+
+
 	// CREATE ELEMENTS
+	void createRadio(string nome, vector <string> options) {
+		element te;
+		vec2 flowing = vec2(0,0);
+		for (auto & o : options) {
+			element tc; // temporary child
+			tc.nome = o;
+			int w = 120;
+			int h = sliderHeight;
+			tc.rect = Rectf(flowing.x, flowing.y, flowing.x + w, flowing.y + h);
+			te.elements.push_back(tc);
+			flowing.x += w + 2;
+		}
+		te.init(nome, RADIO);
+		elements.push_back(te);
+	}
 
 	void createBool(string nome) {
 		element te;
