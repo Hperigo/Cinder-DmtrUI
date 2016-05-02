@@ -1,3 +1,9 @@
+/*
+ 
+
+ */
+
+
 #include "cinder/Xml.h"
 #include "cinder/gl/TextureFont.h"
 
@@ -13,6 +19,8 @@ namespace DmtrUI {
 	Rectf coluna;
 	bool redraw = true;
 	bool useFbo = false;
+
+	string presetsFolder = "presets/";
 
 	map <string, float> 		pFloat;
 	map <string, int>  	 	pInt;
@@ -40,67 +48,106 @@ namespace DmtrUI {
 		int   	*_valInt;
 		bool	  	*_valBool;
 		string	*_valString;
-		string nome;
-		Rectf rect;
-		Color cor;
-		ColorA cor2 = ColorA(0,0,0,.4);
+		string 	nome;
+		Rectf 	rect;
+		Color	cor;
+		ColorA 	corBg = ColorA(0,0,0,.4);
+		ColorA 	textColor;
 		float		min = 0;
 		float		max = 1;
 		float		def = .5;
+		vec2		textOffset;
+
+
+		// seria lindo mas traz "auto return without trailing return type"
+//		auto getVal() {
+//			if (tipo == SLIDER) {
+//				return *_val;
+//			}
+//			else if (tipo == SLIDERINT) {
+//				return *_valInt;
+//			}
+//		}
 
 		void init(string n, elementType t) {
 			nome = n;
 			tipo = t;
 			cor = cores[0];
-			cor2 = coresOver[0];
+			corBg = coresOver[0];
+
+			// local
+			int textY = 18;
+
 			if (tipo == SLIDER) {
 				_val = &pFloat[nome];
 			}
 			else if (tipo == SLIDERINT) {
 				_valInt = &pInt[nome];
 				cor = cores[5];
-				cor2 = coresOver[5];
+				corBg = coresOver[5];
 			}
 			else if (tipo == TOGGLE) {
+				cor = cores[4];
+				corBg = coresOver[4];
+
+				textOffset = vec2(sliderHeight + sliderMargin, textY);
 				_valBool = &pBool[nome];
 			}
-			else if (tipo == RADIO) {
-				_valString = &pString[nome];
+//			else if (tipo == RADIO) {
+//				_valString = &pString[nome];
+//			}
+
+			else if (tipo == LABEL) {
+				textOffset = vec2(0, textY);
 			}
 
+			if (tipo == LABEL || tipo == TOGGLE) {
+				textColor = ColorA(0,0,0,1);
+			}
+
+			if (tipo == SLIDER || tipo == SLIDERINT) {
+				textOffset = vec2(8, textY);
+				textColor = ColorA(1,1,1,1);
+			}
 		}
 
 		void draw() {
-			color(cor);
-			drawSolidRect(rect);
-			float x2;
-			if (tipo == SLIDER) {
-				x2 = lmap<float>(*_val, min, max, 0, rect.x2 - rect.x1);
-			}
-			else if (tipo == SLIDERINT) {
-				x2 = lmap<int>(*_valInt, min, max, 0, rect.x2 - rect.x1);
-			}
-			color(cor2);
-			drawSolidRect(Rectf(rect.x1, rect.y1, rect.x1 + x2, rect.y2));
-			//drawString(nome, rect.getUpperLeft() + vec2(9,11), ColorA(0,0,0,1) );
+			if (tipo == SLIDER || tipo == SLIDERINT || tipo == TOGGLE) {
+				color(cor);
+				drawSolidRect(rect);
+				float x2;
+				if (tipo == SLIDER) {
+					x2 = lmap<float>(*_val, min, max, 0, rect.x2 - rect.x1);
+				}
+				else if (tipo == SLIDERINT) {
+					x2 = lmap<int>(*_valInt, min, max, 0, rect.x2 - rect.x1);
+				}
 
-			color(Color(1,1,1));
-			//fonte.
-			mFont->drawString((nome), rect.getUpperLeft() + vec2(8,17));
-			//drawString(nome, rect.getUpperLeft() + vec2(8,10), ColorA(1,1,1,1.0));
+				if (tipo == TOGGLE) {
+					if (*_valBool) {
+						color(corBg);
+						int margem = 5;
+						drawSolidRect(Rectf(rect.x1 + margem , rect.y1 + margem, rect.x2 - margem, rect.y2 - margem));
+					}
+				} else {
+					color(corBg);
+					drawSolidRect(Rectf(rect.x1, rect.y1, rect.x1 + x2, rect.y2));
+				}
+
+			}
+			color(textColor);
+			mFont->drawString((nome), rect.getUpperLeft() + textOffset);
 		}
 
 		void checkMouse(vec2 mouse) {
-//			cout << mouse << endl;
-//			cout << rect << endl;
-//			cout << "----" << endl;
 			if (tipo == SLIDER) {
 				*_val = lmap<float>(mouse.x , rect.getX1(), rect.getX2(), min, max);
 			} else if (tipo == SLIDERINT) {
 				*_valInt = lmap<int>(mouse.x , rect.getX1(), rect.getX2(), min, max);
 			}
 			else if (tipo == TOGGLE) {
-				*_valBool = !_valBool;
+				*_valBool = !*_valBool;
+				//cout << *_valBool << endl;
 			}
 			redraw = true;
 		}
@@ -131,18 +178,41 @@ namespace DmtrUI {
 
 
 	void save(string filename) {
-		XmlTree saveUI ("ui", "");
+		XmlTree saveUI ("DmtrUI", "");
 		for (auto & e : elements) {
-			saveUI.push_back( XmlTree(e.nome, to_string(*e._val)));
+			if (e.tipo == SLIDER) {
+				saveUI.push_back( XmlTree(e.nome, to_string(*e._val)));
+			}
+			else if (e.tipo == SLIDERINT) {
+				saveUI.push_back( XmlTree(e.nome, to_string(*e._valInt)));
+			}
+			else if (e.tipo == TOGGLE) {
+				saveUI.push_back( XmlTree(e.nome, to_string(*e._valBool)));
+			}
+			else if (e.tipo == RADIO) {
+				saveUI.push_back( XmlTree(e.nome, (*e._valString)));
+			}
+
 		}
 		saveUI.write( writeFile(filename) );
 	}
 
 	void load(string filename) {
 		XmlTree doc ( loadFile (filename) );
-		XmlTree ui =  doc.getChild("ui");
+		XmlTree ui =  doc.getChild("DmtrUI");
 		for (auto & e : elements) {
-			*e._val = (ui.getChild(e.nome).getValue<float>());
+			if (e.tipo == SLIDER) {
+				*e._val = (ui.getChild(e.nome).getValue<float>());
+			}
+			else if (e.tipo == SLIDERINT) {
+				*e._valInt = (ui.getChild(e.nome).getValue<int>());
+			}
+			else if (e.tipo == TOGGLE) {
+				*e._valBool = (ui.getChild(e.nome).getValue<bool>());
+			}
+//			else if (e.tipo == RADIO) {
+//				*e._valString = (ui.getChild(e.nome).getValue<string>());
+//			}
 		}
 	}
 
@@ -155,7 +225,7 @@ namespace DmtrUI {
 		if (key == '1' || key == '2' || key == '3' || key == '4' || key == '5' || key == '6' || key == '7' ||
 			key == '8' || key == '9' || key == '0'
 			) {
-			string nome = string(1,key) + ".xml";
+			string nome = presetsFolder + string(1,key) + ".xml";
 			if (event.isMetaDown()) {
 				cout << "save: " + nome << endl;
 				save(nome);
@@ -173,8 +243,11 @@ namespace DmtrUI {
 
 	void setup( const ci::app::WindowRef& window = ci::app::getWindow()) {
 
+		// Fonte rendering nao muito bom ainda. como melhorar? seria algo do retina?
 		fonte = Font( loadAsset("SimplonBP-Regular.otf"), 50.0 );
-		mFont = gl::TextureFont::create( Font( loadAsset("SimplonBP-Medium.otf"), 20 ));
+//		string fontFile = "SimplonBP-Medium.otf";
+		string fontFile = "SimplonBP-Regular.otf";
+		mFont = gl::TextureFont::create( Font( loadAsset(fontFile), 18 ));
 		//, gl::TextureFont::Format().enableMipmapping()
 
 		static vector<signals::Connection> sWindowConnections;
@@ -203,16 +276,13 @@ namespace DmtrUI {
 		coresOver.push_back(Colorf(234/255.0f,  40/255.0f, 140/255.0f));  // 1 rosa
 		coresOver.push_back(Colorf(255/255.0f,  109/255.0f, 0/255.0f));   // 2 laranja
 		coresOver.push_back(Colorf(255/255.0f,  255/255.0f, 0/255.0f));   // 3 amarelo
-		coresOver.push_back(Colorf(0/255.0f,  211/255.0f, 24/255.0f));    // 4 verde
+		coresOver.push_back(Colorf(0/255.0f,  158/255.0f, 11/255.0f));    // 4 verde OK
 		coresOver.push_back(Colorf(0/255.0f,  175/255.0f, 204/255.0f));   // 5 azul OK
-
 	}
 
 
 	void draw() {
-		//cout << "draw ui " << endl;
 		if (redraw) {
-			//mFbo->bindFramebuffer();
 			if (useFbo) {
 				gl::ScopedFramebuffer fbScp( mFbo );
 				gl::clear(ColorA(0,0,0,0));
@@ -221,7 +291,6 @@ namespace DmtrUI {
 					e.draw();
 				}
 			}
-
 			else {
 				for (auto & e : elements) {
 					e.draw();
@@ -232,79 +301,62 @@ namespace DmtrUI {
 		if (useFbo)
 		{
 			gl::color(1,1,1);
-			gl::draw( mFbo->getColorTexture(), Area (0,0,320,800), Rectf(0,getWindowHeight()-800,320,800) ); //, Rectf(0,800,320,0)
+			gl::draw( mFbo->getColorTexture(), Area (0,0,320,800), Rectf(0,getWindowHeight()-800,320,800) );
 			redraw = false;
 		}
 	}
 
+
+	// CREATE ELEMENTS
+
 	void createBool(string nome) {
 		element te;
-		te.tipo = LABEL;
-		te.nome = nome;
-		te.rect = Rectf(flow.x, flow.y, flow.x + sliderWidth, flow.y + sliderHeight);
+		te.rect = Rectf(flow.x, flow.y, flow.x + sliderHeight, flow.y + sliderHeight);
+		te.cor = Color(1,0,.3);
+		te.init(nome, TOGGLE);
 		elements.push_back(te);
 		flow.y += sliderHeight + sliderMargin;
 	}
 
 	void createLabel(string nome) {
 		element te;
-		te.tipo = LABEL;
-		te.nome = nome;
 		te.rect = Rectf(flow.x, flow.y, flow.x + sliderWidth, flow.y + sliderHeight);
+		te.init(nome, LABEL);
 		elements.push_back(te);
 		flow.y += sliderHeight + sliderMargin;
 	}
 
 	void createSlider(string nome, float min, float max, float def, elementType tipo = SLIDER) {
 		//int hue = int(flow.x + flow.y/6.0)%255;
-		element te; // temp element
-//		te.tipo = tipo;
-//		te.nome = nome;
+		element te;
 		te.rect = Rectf(flow.x, flow.y, flow.x + sliderWidth, flow.y + sliderHeight);
 		te.min = min;
 		te.max = max;
 		te.def = def;
 		te.init(nome, tipo);
-
 		elements.push_back(te);
 		flow.y += sliderHeight + sliderMargin;
-
-//		cout << "create slider: " + nome << endl;
-//		cout << min << endl;
-//		cout << max << endl;
-//		cout << def << endl;
-//		cout << tipo << endl;
-//		cout << "----" << endl;
 	}
-
 
 	void loadSliders(string arq) {
 		std::string line;
 		fs::path arquivo = getAssetPath("") / arq;
 		ifstream myfile(arquivo.string() );
-		//cout << arquivo.string() << endl;
-
 		vector<string> myLines;
-		while (std::getline(myfile, line))
-		{
+		while (std::getline(myfile, line)) {
 			myLines.push_back(line);
 			vector<string> tabs = split( line, "\t" );
-
-			//cout << line << endl;
 			if (line == "") {
-				//uis[ui]->addLabel("");
+				createLabel("");
 			} else {
 				string tipo = tabs[0];
 				string nome = tabs[1];
 				if (tipo == "label") {
-					//uis[ui]->addLabel(nome);
 					createLabel(nome);
 				}
 				else if (tipo == "largelabel") {
-					//uis[ui]->addLabel(nome, FontSize::LARGE);
-				}
-				if (tipo == "squeezy") {
-
+					// large
+					createLabel(nome);
 				}
 				else if (tipo == "float" || tipo == "slider" || tipo == "int") {
 					vector<string> valores = split(tabs[2]," ");
@@ -323,12 +375,9 @@ namespace DmtrUI {
 				} else if (tipo == "toggle" || tipo == "bool") {
 					pBool[nome] = stoi(tabs[2]);
 					createBool(nome);
-					//uis[ui]->addToggle(nome, &pBool[nome]);
 				}
 			}
 		}
 	}
-
-
 
 }; // end namespace;
