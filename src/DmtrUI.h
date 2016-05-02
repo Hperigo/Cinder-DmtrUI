@@ -64,8 +64,10 @@ namespace DmtrUI {
 		float	def = .5;
 		vec2		textOffset;
 
-		// radio, que tal? recursion. will it work?
+		// radio, que tal? recursion. will it work? YESS
 		vector <element> elements;
+
+		bool		selected = false;
 
 		// seria lindo mas traz "auto return without trailing return type"
 //		auto getVal() -> decltype(*_autoVal) {
@@ -166,6 +168,10 @@ namespace DmtrUI {
 			if (tipo == RADIOITEM) {
 				color(cor);
 				drawSolidRect(rect);
+				if (selected) {
+					color(corBg);
+					drawSolidRect(rect);
+				}
 			}
 
 			if (tipo == RADIO) {
@@ -194,8 +200,24 @@ namespace DmtrUI {
 				*_valBool = !*_valBool;
 				//cout << *_valBool << endl;
 			}
+			else if (tipo == RADIO) {
+				for (auto & e : elements) {
+					vec2 mouseOffset = vec2(mouse.x - rect.x1, mouse.y - rect.y1);
+					if (e.rect.contains(mouseOffset)) {
+						e.checkMouse(mouseOffset);
+						*_valString = e.nome;
+						e.selected = true;
+					} else {
+						e.selected = false;
+					}
+					// checar aqui se é exclusivo ou não. comparar com o valor anterior e disparar evento?
+					//
+				}
+			}
 			else if (tipo == RADIOITEM) {
-				
+				// NOT NEEDED
+				//cout << "checkmouse radioitem" << endl;
+				//selected = true;
 			}
 
 			redraw = true;
