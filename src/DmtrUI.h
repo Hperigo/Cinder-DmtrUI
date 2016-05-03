@@ -1,5 +1,13 @@
 /*
 
+
+ CinderImGui.cpp
+ // wrong... and would not work in a multi-windows scenario
+ na verdade ele serve pra fazer o bind nas conexoes. ta beleza.
+ static vector<signals::Connection> sWindowConnections;
+ sWindowConnections.push_back( window->getSignalDraw().connect( newFrameGuard ) );
+
+ make use of events. signals?
  make two kinds of rects. one for layout and another for clicking
  useful in toggle buttons for example
 
@@ -16,6 +24,10 @@ namespace DmtrUI {
 	using namespace std;
 	using namespace cinder::gl;
 
+	bool useCustomFont = false;
+	// teste. nao sei se vai funcionar
+
+	static vector<signals::Connection> signals;
 
 	gl::FboRef			mFbo;
 	Rectf coluna;
@@ -79,6 +91,14 @@ namespace DmtrUI {
 //			}
 //		}
 
+		// meant to load radio button from xml file and set children states.
+		void updateRadio() {
+			for (auto & e : elements) {
+				e.selected = e.nome == *_valString;
+			}
+			redraw = true;
+		}
+
 		void init(string n, elementType t) {
 			nome = n;
 			tipo = t;
@@ -128,7 +148,12 @@ namespace DmtrUI {
 			if (tipo == RADIOITEM) {
 				textColor = ColorA(1,1,1,1);
 				// nao sei se vai funcionar
-				vec2 wh = mFont->measureString(nome);
+				vec2 wh;
+				if (useCustomFont) {
+					wh = mFont->measureString(nome);
+				} else {
+					//wh = gl::measureString(nome);
+				}
 				int margemX = 6;
 				rect.x2 = rect.x1 + wh.x + margemX*2;
 				rect.y2 = rect.y1 + wh.y + 4;
@@ -141,15 +166,19 @@ namespace DmtrUI {
 		}
 
 		void draw() {
+			string texto = nome;
 			if (tipo == SLIDER || tipo == SLIDERINT || tipo == TOGGLE) {
 				color(cor);
 				drawSolidRect(rect);
 				float x2;
 				if (tipo == SLIDER) {
 					x2 = lmap<float>(*_val, min, max, 0, rect.x2 - rect.x1);
+					texto += " : " + to_string(*_val);
 				}
 				else if (tipo == SLIDERINT) {
 					x2 = lmap<int>(*_valInt, min, max, 0, rect.x2 - rect.x1);
+					texto += " : " + to_string(*_valInt);
+
 				}
 
 				if (tipo == TOGGLE) {
@@ -162,7 +191,6 @@ namespace DmtrUI {
 					color(corBg);
 					drawSolidRect(Rectf(rect.x1, rect.y1, rect.x1 + x2, rect.y2));
 				}
-
 			}
 
 			if (tipo == RADIOITEM) {
@@ -186,7 +214,12 @@ namespace DmtrUI {
 				gl::popMatrices();
 			}
 			color(textColor);
-			mFont->drawString((nome), rect.getUpperLeft() + textOffset);
+			//if (mFont->)
+			if (useCustomFont) {
+				mFont->drawString(texto, rect.getUpperLeft() + textOffset);
+			} else {
+				gl::drawString(texto, rect.getUpperLeft() + textOffset);
+			}
 		}
 
 		void checkMouse(vec2 mouse) {
@@ -274,17 +307,27 @@ namespace DmtrUI {
 			XmlTree ui =  doc.getChild("DmtrUI");
 			for (auto & e : elements) {
 				if (e.tipo == SLIDER) {
-					*e._val = (ui.getChild(e.nome).getValue<float>());
+						// try , catch ?
+					if (ui.hasChild(e.nome)) {
+						*e._val = (ui.getChild(e.nome).getValue<float>());
+					}
 				}
 				else if (e.tipo == SLIDERINT) {
-					*e._valInt = (ui.getChild(e.nome).getValue<int>());
+					if (ui.hasChild(e.nome)) {
+						*e._valInt = (ui.getChild(e.nome).getValue<int>());
+					}
 				}
 				else if (e.tipo == TOGGLE) {
-					*e._valBool = (ui.getChild(e.nome).getValue<bool>());
+					if (ui.hasChild(e.nome)) {
+						*e._valBool = (ui.getChild(e.nome).getValue<bool>());
+					}
 				}
-	//			else if (e.tipo == RADIO) {
-	//				*e._valString = (ui.getChild(e.nome).getValue<string>());
-	//			}
+				else if (e.tipo == RADIO) {
+					if (ui.hasChild(e.nome)) {
+						*e._valString = (ui.getChild(e.nome).getValue<string>());
+					}
+					e.updateRadio();
+				}
 			}
 		}
 	}
@@ -351,16 +394,18 @@ namespace DmtrUI {
 		}
 	}
 
-
-	void setup( const ci::app::WindowRef& window = ci::app::getWindow()) {
-
+	void loadFont (string fontFile) {
 		// Fonte rendering nao muito bom ainda. como melhorar? seria algo do retina?
-		fonte = Font( loadAsset("SimplonBP-Regular.otf"), 50.0 );
-//		string fontFile = "SimplonBP-Medium.otf";
-		string fontFile = "SimplonBP-Regular.otf";
+		//fonte = Font( loadAsset("SimplonBP-Regular.otf"), 50.0 );
+		//		string fontFile = "SimplonBP-Medium.otf";
+		//string fontFile = "SimplonBP-Regular.otf";
 		mFont = gl::TextureFont::create( Font( loadAsset(fontFile), 18 ));
 		//, gl::TextureFont::Format().enableMipmapping()
+		useCustomFont = true;
+	}
 
+
+	void setup( const ci::app::WindowRef& window = ci::app::getWindow()) {
 		static vector<signals::Connection> sWindowConnections;
 		sWindowConnections = {
 			window->getSignalMouseDown().connect( mouseDown ),
