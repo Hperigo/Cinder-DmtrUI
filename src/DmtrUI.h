@@ -110,9 +110,11 @@ namespace DmtrUI {
 
 			if (tipo == SLIDER) {
 				_val = &pFloat[nome];
+                *_val = max * (def / max);
 			}
 			else if (tipo == SLIDERINT) {
 				_valInt = &pInt[nome];
+                *_valInt = max * (def / max);
 				cor = cores[5];
 				corBg = coresOver[5];
 			}
