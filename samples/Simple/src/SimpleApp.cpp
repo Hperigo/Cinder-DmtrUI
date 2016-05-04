@@ -19,6 +19,7 @@ class SimpleApp : public App {
 void SimpleApp::setup()
 {
     
+
     DmtrUI::setup();
     
     DmtrUI::createLabel("This is a Label");
